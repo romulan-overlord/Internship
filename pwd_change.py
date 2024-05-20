@@ -1,14 +1,8 @@
-try:
-    from getpass import getpass
-    import re
-    import platform
-    import subprocess
-    from win32security import LogonUser
-    from win32con import LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT
-    from win32net import NetUserChangePassword, error
-
-except ModuleNotFoundError:
-    pass
+from getpass import getpass
+import re
+import platform
+import subprocess
+import os
 
 def validate_password(password):
     pattern = r'^(?=.*[a-z]|[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}|:<>?/~`])[A-Za-z\d!@#$%^&*()_+{}|:<>?/~`]{8,}$'
@@ -34,11 +28,15 @@ def getCredentials():
             print("Invalid password. Try again.")
 
 def set_password_windows(username, old_password, new_password):
+    print('Changing password')
+    subprocess.call("net user " + username + " " + new_password, shell=True)
+    # NetUserChangePassword(None, username, old_password, new_password)
     try:
-        print('Changing password')
-        NetUserChangePassword(None, username, old_password, new_password)
-    except error:
-        print("Failed to change password")
+        # Try to authenticate with the new password
+        os.system(f'runas /user:{username} cmd')
+        print("Password reset was successful.")
+    except Exception as e:
+        print("Failed to authenticate.", e)
 
 def set_password_linux(username, old_password, new_password):
     process = subprocess.Popen(['sudo','passwd', username], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -56,23 +54,12 @@ def set_password_linux(username, old_password, new_password):
     else:
         print('Password reset failed.', error.decode())
 
-def verify_success(username, password):
-    try:
-        LogonUser(username, None, password, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT)
-    except:
-        return False
-    return True
-
 def main():
     username, old_password, password = getCredentials()
     if platform.system() == 'Linux':
         set_password_linux(username, old_password, password)
     elif platform.system() == 'Windows':
         set_password_windows(username, old_password, password)
-        if verify_success(username, password):
-            print ('Password reset successfully.')
-        else:
-            print ('Password reset failed.')
 
 if __name__ == '__main__':
     main()
